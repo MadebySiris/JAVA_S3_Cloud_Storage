@@ -1,0 +1,7 @@
+Hello from Java!
+
+This file was uploaded to Amazon S3 using the AWS SDK for Java v2.
+It demonstrates how a Java application can write objects to cloud object storage
+using a PutObjectRequest — just like writing to a remote file system.
+
+Retrieved successfully? That means GetObjectRequest worked too.
