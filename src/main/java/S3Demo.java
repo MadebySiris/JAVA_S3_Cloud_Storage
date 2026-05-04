@@ -78,18 +78,19 @@ public class S3Demo {
 
                 // ── Upload ─────────────────────────────────────────────────
                 case "1":
-                    System.out.print("Enter the path of the file to upload (or . to browse current directory): ");
+                    System.out.print("Enter the path of the file to upload (or . , .. , ../.. to browse a directory): ");
                     try {
                         String uploadPath = scanner.nextLine().trim();
                         if (uploadPath.isEmpty()) {
                             System.out.println("[ERROR] File path cannot be empty.");
                             break;
                         }
-                        if (uploadPath.equals(".")) {
-                            uploadPath = browseCurrentDirectory(scanner);
-                            if (uploadPath == null) break;
-                        }
                         Path uploadSrc = Path.of(uploadPath);
+                        if (Files.isDirectory(uploadSrc)) {
+                            uploadPath = browseDirectory(scanner, uploadSrc);
+                            if (uploadPath == null) break;
+                            uploadSrc = Path.of(uploadPath);
+                        }
                         if (!Files.exists(uploadSrc)) {
                             System.out.println("[ERROR] File not found: " + uploadPath);
                             System.out.println("        Check the path and try again.");
@@ -141,14 +142,23 @@ public class S3Demo {
                             System.out.println("[ERROR] Filename cannot be empty.");
                             break;
                         }
-                        System.out.print("Enter destination path (e.g. downloaded.txt): ");
+                        System.out.print("Enter destination path (file, or . , .. , ../.. for a directory): ");
                         String destPath = scanner.nextLine().trim();
                         if (destPath.isEmpty()) {
                             System.out.println("[ERROR] Destination path cannot be empty.");
                             break;
                         }
-                        downloadFile(s3, bucket, downloadKey, Path.of(destPath));
-                        System.out.println("[OK] Downloaded \"" + downloadKey + "\" -> " + destPath);
+                        Path dest = Path.of(destPath);
+                        if (Files.isDirectory(dest)) {
+                            dest = dest.resolve(Path.of(downloadKey).getFileName().toString());
+                        }
+                        if (Files.exists(dest)) {
+                            System.out.println("[ERROR] File already exists: " + dest.toAbsolutePath().normalize());
+                            System.out.println("        Choose a different destination or remove the existing file.");
+                            break;
+                        }
+                        downloadFile(s3, bucket, downloadKey, dest);
+                        System.out.println("[OK] Downloaded \"" + downloadKey + "\" -> " + dest.toAbsolutePath().normalize());
                     } catch (NoSuchBucketException e) {
                         System.out.println("[ERROR] Bucket \"" + bucket + "\" does not exist.");
                         System.out.println("        Create it in the AWS Console or check the bucket name.");
@@ -206,18 +216,18 @@ public class S3Demo {
         s3.close();
     }
 
-    static String browseCurrentDirectory(Scanner scanner) {
+    static String browseDirectory(Scanner scanner, Path dir) {
         try {
-            List<Path> files = Files.list(Path.of("."))
+            List<Path> files = Files.list(dir)
                     .filter(Files::isRegularFile)
                     .collect(Collectors.toList());
 
             if (files.isEmpty()) {
-                System.out.println("[ERROR] No files found in the current directory.");
+                System.out.println("[ERROR] No files found in: " + dir.toAbsolutePath().normalize());
                 return null;
             }
 
-            System.out.println("\nFiles in current directory:");
+            System.out.println("\nFiles in " + dir.toAbsolutePath().normalize() + ":");
             for (int i = 0; i < files.size(); i++) {
                 System.out.printf("  %d. %s%n", i + 1, files.get(i).getFileName());
             }
